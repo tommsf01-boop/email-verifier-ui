@@ -14,176 +14,190 @@
       cursor: pointer;
     }
     #drop-zone.hover { border-color: #000; }
-    .job-block {
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      padding: 20px;
-      margin: 20px auto;
-      width: 400px;
-      background: #fafafa;
-      text-align: left;
+    #jobs { max-width: 600px; margin: 40px auto; text-align: left; }
+    .job {
+      border: 1px solid #eee;
+      background: #fff;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      padding: 12px 16px;
       position: relative;
     }
-    .progress-bar {
-      height: 18px;
-      background: #4caf50;
-      width: 0%;
-      transition: width 0.2s;
-      border-radius: 10px;
-    }
-    .progress-container {
-      background: #eee;
-      border-radius: 10px;
-      overflow: hidden;
-      margin: 10px 0;
-    }
-    .status, .log-line, .actions {
-      font-size: 13px;
-      margin-top: 5px;
-    }
-    .actions a {
-      color: #007aff;
-      cursor: pointer;
-      text-decoration: underline;
-    }
-    .close-job {
+    .job h4 { margin: 0 0 8px 0; }
+    .job small {
       position: absolute;
-      top: 10px;
+      top: 15px;
       right: 15px;
       font-size: 14px;
-      color: #999;
-      cursor: pointer;
+      color: #999
     }
-    footer {
-      margin-top: 40px;
-      font-size: 13px;
+    .log-box {
+      background: #f3f3f3;
+      margin-top: 8px;
+      padding: 8px;
+      font-family: monospace;
+      max-height: 120px;
+      overflow-y: auto;
+      white-space: pre-line;
     }
-    footer a {
-      color: #000;
-      text-decoration: underline;
+    .progress-bar {
+      background: #eee;
+      height: 8px;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .progress-bar-inner {
+      height: 100%;
+      background: #4caf50;
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+    .download-links {
+      margin-top: 8px;
+      font-size: 14px;
+    }
+    .download-links a {
+      margin-right: 4px;
+    }
+    #file-input {
+      display: none;
     }
   </style>
 </head>
 <body>
-  <h1>Upload Emails to Verify</h1>
+  <h1>Email Verifier</h1>
+  <p>Drop your CSV file with an "email" column, or click below to select.</p>
   <div id="drop-zone">Drop CSV here or click to upload</div>
-  <input type="file" id="file-input" accept=".csv" style="display:none;">
-  <div id="jobs"></div>
+  <input type="file" id="file-input" accept=".csv" />
 
-  <footer>
-    This tool helps you find qualified leads. Now let's get you more sales with
-    <a href="https://www.alxberman.com/mastermind?utm_source=tools&utm_campaign=desktopverifier&utm_medium=footer" target="_blank">AB Mastermind</a>
-  </footer>
+  <div id="jobs"></div>
 
   <script>
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
     const jobsContainer = document.getElementById('jobs');
 
-    let jobList = JSON.parse(localStorage.getItem('verifier-jobs') || '[]');
-    jobList.forEach(({ job_id, fileName }) => createJobBlock(job_id, fileName));
-
     dropZone.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('hover'); });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('hover'));
-    dropZone.addEventListener('drop', e => {
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('hover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('hover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
       e.preventDefault();
       dropZone.classList.remove('hover');
-      handleFile(e.dataTransfer.files[0]);
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        uploadFile(file);
+      }
     });
-    fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
 
-    function handleFile(file) {
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (file) {
+        uploadFile(file);
+      }
+    });
+
+    function uploadFile(file) {
       const formData = new FormData();
       formData.append('file', file);
 
-      fetch('http://localhost:5050/verify', {
+      // create job in UI immediately
+      const jobId = 'job_' + Math.random().toString(36).substring(2, 9);
+      const jobEl = document.createElement('div');
+      jobEl.className = 'job';
+      jobEl.id = jobId;
+      jobEl.innerHTML = `
+        <h4>${file.name}</h4>
+        <small>Processing...</small>
+        <div class="progress-bar"><div class="progress-bar-inner" style="width:0%"></div></div>
+        <div class="log-box">Uploading...</div>
+      `;
+      jobsContainer.prepend(jobEl);
+
+      fetch('http://ng8g4c8occ8osck40sscs84g.62.38.222.74.sslip.io/verify', {
         method: 'POST',
         body: formData
       })
-      .then(res => res.json())
-      .then(({ job_id }) => {
-        jobList.push({ job_id, fileName: file.name });
-        localStorage.setItem('verifier-jobs', JSON.stringify(jobList));
-        createJobBlock(job_id, file.name);
+      .then(r => r.json())
+      .then(data => {
+        console.log('UPLOAD DONE', data);
+        // the server returns job_id, we should start polling
+        if (data.job_id) {
+          startPolling(jobId, data.job_id, file.name);
+        } else {
+          jobEl.querySelector('.log-box').textContent = 'Error: No job_id returned from server.';
+          jobEl.querySelector('small').textContent = 'Error';
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        jobEl.querySelector('.log-box').textContent = 'Error uploading file.';
+        jobEl.querySelector('small').textContent = 'Error';
       });
     }
 
-    function createJobBlock(job_id, fileName) {
-      const block = document.createElement('div');
-      block.className = 'job-block';
-      block.innerHTML = `
-        <div class="close-job">✖</div>
-        <div><strong>${fileName}</strong></div>
-        <div class="progress-container"><div class="progress-bar"></div></div>
-        <div class="status">Starting...</div>
-        <div class="log-line"></div>
-        <div class="actions"><a class="cancel">Cancel</a></div>
-      `;
-      jobsContainer.prepend(block);
+    function startPolling(jobElementId, serverJobId, filename) {
+      const jobEl = document.getElementById(jobElementId);
+      const logBox = jobEl.querySelector('.log-box');
+      const progressBarInner = jobEl.querySelector('.progress-bar-inner');
+      const statusSmall = jobEl.querySelector('small');
 
-      const bar = block.querySelector('.progress-bar');
-      const status = block.querySelector('.status');
-      const logLine = block.querySelector('.log-line');
-      const cancelBtn = block.querySelector('.cancel');
-      const actions = block.querySelector('.actions');
-      const closeBtn = block.querySelector('.close-job');
+      const intervalId = setInterval(() => {
+        // progress
+        fetch(`http://ng8g4c8occ8osck40sscs84g.62.38.222.74.sslip.io/progress?job_id=${serverJobId}`)
+          .then(r => r.json())
+          .then(progressData => {
+            const pct = progressData.progress || 0;
+            progressBarInner.style.width = pct + '%';
 
-      let canceled = false;
-      const removeJob = () => {
-        block.remove();
-        jobList = jobList.filter(j => j.job_id !== job_id);
-        localStorage.setItem('verifier-jobs', JSON.stringify(jobList));
-      };
-
-      cancelBtn.onclick = () => {
-        canceled = true;
-        fetch(`http://localhost:5050/cancel?job_id=${job_id}`, { method: 'POST' });
-        status.innerText = `❌ Canceled job ${job_id}`;
-        actions.innerHTML = '';
-      };
-
-      closeBtn.onclick = () => {
-        fetch(`http://localhost:5050/cancel?job_id=${job_id}`, { method: 'POST' });
-        removeJob();
-      };
-
-      const poll = setInterval(() => {
-        if (canceled) return clearInterval(poll);
-
-        fetch(`http://localhost:5050/progress?job_id=${job_id}`)
-          .then(res => res.json())
-          .then(data => {
-            bar.style.width = `${data.percent}%`;
-            status.innerText = `${data.percent}% done – Row ${data.row} of ${data.total}`;
+            if (pct < 100) {
+              statusSmall.textContent = `Processing... (${pct}%)`;
+            } else {
+              statusSmall.textContent = 'Done';
+            }
           });
 
-        fetch(`http://localhost:5050/log?job_id=${job_id}`)
-          .then(res => res.text())
-          .then(text => {
-            logLine.innerText = text.replace(/^\[\d+%\] \(\d+\/\d+\) /, '');
-          });
-      }, 1000);
+        // logs
+        fetch(`http://ng8g4c8occ8osck40sscs84g.62.38.222.74.sslip.io/log?job_id=${serverJobId}`)
+          .then(r => r.json())
+          .then(logData => {
+            logBox.textContent = logData.logs.join('\n');
 
-      const wait = setInterval(() => {
-        if (canceled) return clearInterval(wait);
-        fetch(`http://localhost:5050/progress?job_id=${job_id}`)
-          .then(res => res.json())
-          .then(data => {
-            if (data.percent >= 100) {
-              clearInterval(wait);
-              actions.innerHTML = `
-                <div style="margin-top: 10px;">
-                  <strong>⬇️ Download CSV:</strong><br>
-                 <div>
-      <a href="http://localhost:5050/download?job_id=${job_id}&type=all" target="_blank">All Leads</a> |
-      <a href="http://localhost:5050/download?job_id=${job_id}&type=valid" target="_blank">Valid Only</a>
-    </div>
-    <div>
-      <a href="http://localhost:5050/download?job_id=${job_id}&type=risky" target="_blank">Risky Only</a> |
-      <a href="http://localhost:5050/download?job_id=${job_id}&type=risky_invalid" target="_blank">Risky & Invalid</a>
-    </div>
+            // if done, show download links and stop polling
+            if (logData.status === 'done') {
+              clearInterval(intervalId);
+              statusSmall.textContent = 'Done';
+              const pct = 100;
+              progressBarInner.style.width = pct + '%';
+
+              jobEl.innerHTML = `
+                <h4>${filename}</h4>
+                <small>Done</small>
+                <div class="progress-bar">
+                  <div class="progress-bar-inner" style="width: 100%"></div>
+                </div>
+                <div class="log-box">${logData.logs.join('<br>')}</div>
+                <div class="download-links">
+                  <div>
+                    <strong>Download results:</strong>
                   </div>
+                  <div>
+                    <a href="http://ng8g4c8occ8osck40sscs84g.62.38.222.74.sslip.io/download?job_id=${serverJobId}&type=all" target="_blank">All</a> |
+                    <a href="http://ng8g4c8occ8osck40sscs84g.62.38.222.74.sslip.io/download?job_id=${serverJobId}&type=valid" target="_blank">Valid Only</a>
+                  </div>
+                  <div>
+                    <a href="http://ng8g4c8occ8osck40sscs84g.62.38.222.74.sslip.io/download?job_id=${serverJobId}&type=risky" target="_blank">Risky Only</a> |
+                    <a href="http://ng8g4c8occ8osck40sscs84g.62.38.222.74.sslip.io/download?job_id=${serverJobId}&type=risky_invalid" target="_blank">Risky & Invalid</a>
+                  </div>
+                </div>
               `;
             }
           });
