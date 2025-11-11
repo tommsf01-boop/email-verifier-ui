@@ -122,7 +122,7 @@
       `;
       jobsContainer.prepend(jobEl);
 
-      fetch('http://ng8g4c8occ8osck40sscs84g.46.62.238.74.sslip.io/verify', {
+      fetch('https://verify-api.namenestpro.com/verify', {
         method: 'POST',
         body: formData
       })
@@ -152,7 +152,7 @@
 
       const intervalId = setInterval(() => {
         // progress
-        fetch(`http://ng8g4c8occ8osck40sscs84g.46.62.238.74.sslip.io/progress?job_id=${serverJobId}`)
+        fetch(`https://verify-api.namenestpro.com/progress?job_id=${serverJobId}`)
           .then(r => r.json())
           .then(progressData => {
             const pct = progressData.progress || 0;
@@ -166,7 +166,7 @@
           });
 
         // logs
-        fetch(`http://ng8g4c8occ8osck40sscs84g.46.62.238.74.sslip.io/log?job_id=${serverJobId}`)
+        fetch(`https://verify-api.namenestpro.com/log?job_id=${serverJobId}`)
           .then(r => r.json())
           .then(logData => {
             logBox.textContent = logData.logs.join('\n');
@@ -190,12 +190,12 @@
                     <strong>Download results:</strong>
                   </div>
                   <div>
-                    <a href="http://ng8g4c8occ8osck40sscs84g.46.62.238.74.sslip.io/download?job_id=${serverJobId}&type=all" target="_blank">All</a> |
-                    <a href="http://ng8g4c8occ8osck40sscs84g.46.62.238.74.sslip.io/download?job_id=${serverJobId}&type=valid" target="_blank">Valid Only</a>
+                    <a href="https://verify-api.namenestpro.com/download?job_id=${serverJobId}&type=all" target="_blank">All</a> |
+                    <a href="https://verify-api.namenestpro.com/download?job_id=${serverJobId}&type=valid" target="_blank">Valid Only</a>
                   </div>
                   <div>
-                    <a href="http://ng8g4c8occ8osck40sscs84g.46.62.238.74.sslip.io/download?job_id=${serverJobId}&type=risky" target="_blank">Risky Only</a> |
-                    <a href="http://ng8g4c8occ8osck40sscs84g.46.62.238.74.sslip.io/download?job_id=${serverJobId}&type=risky_invalid" target="_blank">Risky & Invalid</a>
+                    <a href="https://verify-api.namenestpro.com/download?job_id=${serverJobId}&type=risky" target="_blank">Risky Only</a> |
+                    <a href="https://verify-api.namenestpro.com/download?job_id=${serverJobId}&type=risky_invalid" target="_blank">Risky & Invalid</a>
                   </div>
                 </div>
               `;
